@@ -43,7 +43,7 @@ try:
     google_search_tool = Tool.from_google_search_retrieval()
 
     model = genai.GenerativeModel(
-        model_name="gemini-1.5-pro-latest",
+        model_name="gemini-2.5-pro",
         system_instruction="""Concisely answer questions, referring to reliable sources. Cite your sources. Rely on high-quality sources and treat lower quality sources (such as YouTube) with skepticism. """,
         tools=[google_search_tool], # Pass the correctly defined tool object
     )
