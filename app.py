@@ -4,6 +4,8 @@
 
 import streamlit as st
 import google.generativeai as genai
+# We may need to import the lower-level 'Tool' object if the simple string doesn't work.
+# For now, we will try the simplest correct format.
 
 # --- App Configuration ---
 st.set_page_config(
@@ -13,8 +15,9 @@ st.set_page_config(
 )
 
 # --- App Title and Description ---
-st.title("🤖 Conversational Smart Search")
-st.write("This app uses Google Search to answer questions conversationally, with citations.")
+st.title("🤖✨ Dave0's Smart Search")
+st.write("Conversational search with citations. Ask follow-ups.")
+
 
 # --- API Key Configuration ---
 # Securely configure the API key from Streamlit's secrets
@@ -30,31 +33,61 @@ except Exception as e:
 
 
 # --- Model Configuration ---
-# This is where we translate the logic from your original script
-# We define the system instruction and enable the Google Search tool.
-model = genai.GenerativeModel(
-    model_name="gemini-1.5-pro-latest",
-    system_instruction="""Concisely answer questions, referring to reliable sources. Cite your sources. Rely on high-quality sources and treat lower quality sources (such as YouTube) with skepticism. """,
-    tools=['google_search'],
-)
+# CORRECTED SECTION:
+# We enable the Google Search tool. The correct way is to use a Tool object.
+# However, let's try the simplest form that specifies grounding directly.
+try:
+    from google.generativeai.types import Tool
+
+    # The modern and explicit way to define the search tool
+    google_search_tool = Tool.from_google_search_retrieval()
+
+    model = genai.GenerativeModel(
+        model_name="gemini-1.5-pro-latest",
+        system_instruction="""Concisely answer questions, referring to reliable sources. Cite your sources. Rely on high-quality sources and treat lower quality sources (such as YouTube) with skepticism. """,
+        tools=[google_search_tool], # Pass the correctly defined tool object
+    )
+except (ImportError, AttributeError):
+    # Fallback for slightly different library versions or simpler cases
+    # This enables grounding which uses Google Search.
+    model = genai.GenerativeModel(
+        model_name="gemini-1.5-pro-latest",
+        system_instruction="""Concisely answer questions, referring to reliable sources. Cite your sources. Rely on high-quality sources and treat lower quality sources (such as YouTube) with skepticism. """,
+        tools=["google_search_retrieval"], # Using the name from the error log
+    )
+
 
 # --- Chat Interface ---
-# Get user input from a text area
-user_prompt = st.text_area("Enter your question:", height=100)
+# Initialize chat history in Streamlit's session state
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-# Create a button to send the prompt
-if st.button("Generate Answer"):
-    if user_prompt:  # Check if the user has entered anything
-        with st.spinner("Searching and generating response..."):  # Show a loading message
+# Display past messages
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# Get user input from a chat input box
+if user_prompt := st.chat_input("Ask your question here:"):
+    # Add user message to session state and display it
+    st.session_state.messages.append({"role": "user", "content": user_prompt})
+    with st.chat_message("user"):
+        st.markdown(user_prompt)
+
+    # Generate and display the AI's response
+    with st.chat_message("assistant"):
+        with st.spinner("Searching and thinking..."):
             try:
-                # To stream the response, we call generate_content with stream=True
-                response_stream = model.generate_content(user_prompt, stream=True)
-
+                # Start a chat session to maintain context
+                chat = model.start_chat(history=[
+                    {"role": msg["role"], "parts": [msg["content"]]}
+                    for msg in st.session_state.messages[:-1] # Exclude the last user message
+                ])
+                # Send the new prompt and stream the response
+                response = chat.send_message(user_prompt, stream=True)
                 # Use st.write_stream to display the output as it comes in
-                st.write("### AI Response:")
-                st.write_stream(response_stream)
-
+                full_response = st.write_stream(response)
+                # Add the complete AI response to session state
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
             except Exception as e:
-                st.error(f"An error occurred while generating the response: {e}")
-    else:
-        st.warning("Please enter a question first.")
+                st.error(f"An error occurred: {e}")
