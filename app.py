@@ -31,11 +31,12 @@ except Exception as e:
 
 
 # --- Model Configuration ---
-# CORRECTED SECTION BASED ON ERROR LOGS:
-# 1. Using the stable "gemini-pro" model name to resolve the "404 Not Found" error.
-# 2. Using "google_search_retrieval" as the tool name, as specified by the ValueError log.
+# FINAL CORRECTION BASED ON ERROR LOGS:
+# The logs show the API call is to the 'v1beta' endpoint.
+# The correct model name for that endpoint is "gemini-1.0-pro".
+# The tool name "google_search_retrieval" is confirmed correct by the logs.
 model = genai.GenerativeModel(
-    model_name="gemini-pro",
+    model_name="gemini-1.0-pro",
     system_instruction="""Concisely answer questions, referring to reliable sources. Cite your sources. Rely on high-quality sources and treat lower quality sources (such as YouTube) with skepticism. """,
     tools=["google_search_retrieval"],
 )
