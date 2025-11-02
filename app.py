@@ -3,7 +3,8 @@
 # google-generativeai
 
 import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 # --- App Configuration ---
 st.set_page_config(
@@ -17,30 +18,30 @@ st.title("🤖✨ Dave0's Smart Search")
 st.write("Conversational search with citations. Ask follow-ups.")
 
 
-# --- API Key Configuration ---
+# --- API Key and Client Configuration ---
 # Securely configure the API key from Streamlit's secrets
 try:
     api_key = st.secrets["GOOGLE_API_KEY"]
-    genai.configure(api_key=api_key)
+    # In this style, we instantiate a Client object
+    client = genai.Client(api_key=api_key)
 except KeyError:
     st.error("API key not found. Please add `GOOGLE_API_KEY` to your Streamlit secrets.")
     st.stop()
 except Exception as e:
-    st.error(f"An error occurred during API key configuration: {e}")
+    st.error(f"An error occurred during client configuration: {e}")
     st.stop()
 
 
-# --- Model Configuration ---
-# FINAL CORRECTION BASED ON ERROR LOGS:
-# The logs show the API call is to the 'v1beta' endpoint.
-# The correct model name for that endpoint is "gemini-1.0-pro".
-# The tool name "google_search_retrieval" is confirmed correct by the logs.
-model = genai.GenerativeModel(
-    model_name="gemini-1.0-pro",
-    system_instruction="""Concisely answer questions, referring to reliable sources. Cite your sources. Rely on high-quality sources and treat lower quality sources (such as YouTube) with skepticism. """,
-    tools=["google_search_retrieval"],
+# --- Model Configuration Objects ---
+# In this style, configuration is done through explicit "types" objects
+system_instruction = types.Part.from_text(
+    """Concisely answer questions, referring to reliable sources. Cite your sources. Rely on high-quality sources and treat lower quality sources (such as YouTube) with skepticism. """
 )
 
+# Using the tool name from the error logs
+tools = [
+    types.Tool.from_google_search_retrieval()
+]
 
 # --- Chat Interface ---
 # Initialize chat history in Streamlit's session state
@@ -63,17 +64,29 @@ if user_prompt := st.chat_input("Ask your question here:"):
     with st.chat_message("assistant"):
         with st.spinner("Searching and thinking..."):
             try:
-                # Create a chat session with the full history
-                chat = model.start_chat(history=[
-                    {"role": msg["role"], "parts": [msg["content"]]}
-                    for msg in st.session_state.messages[:-1]
-                ])
+                # Build the full conversation history in the 'types.Content' format
+                # The old client does not have a stateful 'chat' object
+                contents = []
+                for message in st.session_state.messages:
+                    role = "user" if message["role"] == "user" else "model"
+                    contents.append(
+                        types.Content(role=role, parts=[types.Part.from_text(message["content"])])
+                    )
 
-                # Send the new prompt and stream the response
-                response = chat.send_message(user_prompt, stream=True)
+                # Call the API using the client's stream method
+                response_stream = client.models.generate_content_stream(
+                    model="models/gemini-1.0-pro", # This model name is from the 'v1beta' endpoint
+                    contents=contents,
+                    system_instruction=system_instruction,
+                    tools=tools
+                )
 
-                # Use st.write_stream to display the output as it comes in
-                full_response = st.write_stream(response)
+                # Stream the text from each chunk of the response
+                def stream_chunks(stream):
+                    for chunk in stream:
+                        yield chunk.text
+
+                full_response = st.write_stream(stream_chunks(response_stream))
 
                 # Add the complete AI response to the session state
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
