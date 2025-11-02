@@ -4,8 +4,6 @@
 
 import streamlit as st
 import google.generativeai as genai
-# We may need to import the lower-level 'Tool' object if the simple string doesn't work.
-# For now, we will try the simplest correct format.
 
 # --- App Configuration ---
 st.set_page_config(
@@ -34,27 +32,13 @@ except Exception as e:
 
 # --- Model Configuration ---
 # CORRECTED SECTION:
-# We enable the Google Search tool. The correct way is to use a Tool object.
-# However, let's try the simplest form that specifies grounding directly.
-try:
-    from google.generativeai.types import Tool
-
-    # The modern and explicit way to define the search tool
-    google_search_tool = Tool.from_google_search_tool()
-
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-pro",
-        system_instruction="""Concisely answer questions, referring to reliable sources. Cite your sources. Rely on high-quality sources and treat lower quality sources (such as YouTube) with skepticism. """,
-        tools=[google_search_tool], # Pass the correctly defined tool object
-    )
-except (ImportError, AttributeError):
-    # Fallback for slightly different library versions or simpler cases
-    # This enables grounding which uses Google Search.
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-pro",
-        system_instruction="""Concisely answer questions, referring to reliable sources. Cite your sources. Rely on high-quality sources and treat lower quality sources (such as YouTube) with skepticism. """,
-        tools=["google_search_tool"], # Using the name from the error log
-    )
+# 1. Using the correct, publicly available model name.
+# 2. Using the correct string identifier for the Google Search tool.
+model = genai.GenerativeModel(
+    model_name="gemini-1.5-pro-latest",  # FIX #1: Correct model name
+    system_instruction="""Concisely answer questions, referring to reliable sources. Cite your sources. Rely on high-quality sources and treat lower quality sources (such as YouTube) with skepticism. """,
+    tools=["google_search_retrieval"],  # FIX #2: Correct tool name
+)
 
 
 # --- Chat Interface ---
@@ -78,16 +62,20 @@ if user_prompt := st.chat_input("Ask your question here:"):
     with st.chat_message("assistant"):
         with st.spinner("Searching and thinking..."):
             try:
-                # Start a chat session to maintain context
+                # Create a chat session with the full history
                 chat = model.start_chat(history=[
                     {"role": msg["role"], "parts": [msg["content"]]}
-                    for msg in st.session_state.messages[:-1] # Exclude the last user message
+                    for msg in st.session_state.messages[:-1] # Exclude the last user message to send it fresh
                 ])
+
                 # Send the new prompt and stream the response
                 response = chat.send_message(user_prompt, stream=True)
+
                 # Use st.write_stream to display the output as it comes in
                 full_response = st.write_stream(response)
-                # Add the complete AI response to session state
+
+                # Add the complete AI response to the session state
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
+
             except Exception as e:
                 st.error(f"An error occurred: {e}")
