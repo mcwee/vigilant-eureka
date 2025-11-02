@@ -1,82 +1,60 @@
-# To run this code you need to install the following dependencies:
-# pip install google-genai
+# requirements.txt should contain:
+# streamlit
+# google-generativeai
 
-import base64
-import os
+import streamlit as st
 import google.generativeai as genai
 
-# from google import genai
-# from google.genai import types
-import streamlit as st
+# --- App Configuration ---
+st.set_page_config(
+    page_title="Conversational Smart Search",
+    page_icon="🤖",
+    layout="centered",
+)
 
 # --- App Title and Description ---
-st.title("🤖✨ Dave0's Smart Search")
-st.write("Conversational search with citations. Ask follow-ups.")
+st.title("🤖 Conversational Smart Search")
+st.write("This app uses Google Search to answer questions conversationally, with citations.")
 
 # --- API Key Configuration ---
-# IMPORTANT: This line looks for the API key in Streamlit's secret management
-# You will set this in the Streamlit Community Cloud settings.
+# Securely configure the API key from Streamlit's secrets
 try:
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-except Exception:
-    st.error("API key not found. Please add it to your Streamlit secrets.")
+    api_key = st.secrets["GOOGLE_API_KEY"]
+    genai.configure(api_key=api_key)
+except KeyError:
+    st.error("API key not found. Please add `GOOGLE_API_KEY` to your Streamlit secrets.")
     st.stop()
+except Exception as e:
+    st.error(f"An error occurred during API key configuration: {e}")
+    st.stop()
+
+
+# --- Model Configuration ---
+# This is where we translate the logic from your original script
+# We define the system instruction and enable the Google Search tool.
+model = genai.GenerativeModel(
+    model_name="gemini-1.5-pro-latest",
+    system_instruction="""Concisely answer questions, referring to reliable sources. Cite your sources. Rely on high-quality sources and treat lower quality sources (such as YouTube) with skepticism. """,
+    tools=['google_search'],
+)
 
 # --- Chat Interface ---
 # Get user input from a text area
-user_prompt = st.text_area("Enter your message to the AI:", height=150)
+user_prompt = st.text_area("Enter your question:", height=100)
 
 # Create a button to send the prompt
-if st.button("Send"):
-    if user_prompt: # Check if the user has entered anything
-        with st.spinner("The AI is thinking..."): # Show a loading message
+if st.button("Generate Answer"):
+    if user_prompt:  # Check if the user has entered anything
+        with st.spinner("Searching and generating response..."):  # Show a loading message
             try:
-                # Send the prompt to the model
-                response = model.generate_content(user_prompt)
-                # Display the AI's response
+                # To stream the response, we call generate_content with stream=True
+                response_stream = model.generate_content(user_prompt, stream=True)
+
+                # Use st.write_stream to display the output as it comes in
                 st.write("### AI Response:")
-                st.write(response.text)
+                st.write_stream(response_stream)
+
             except Exception as e:
-                st.error(f"An error occurred: {e}")
+                st.error(f"An error occurred while generating the response: {e}")
     else:
-        st.warning("Please enter a message first.")
-
-# def generate():
-#    client = genai.Client(
-#        api_key=os.environ.get("GEMINI_API_KEY"),
-#    )
-
-    model = "gemini-2.5-pro"
-    contents = [
-        types.Content(
-            role="user",
-            parts=[
-                types.Part.from_text(text="""INSERT_INPUT_HERE"""),
-            ],
-        ),
-    ]
-    tools = [
-        types.Tool(url_context=types.UrlContext()),
-        types.Tool(googleSearch=types.GoogleSearch(
-        )),
-    ]
-    generate_content_config = types.GenerateContentConfig(
-        thinking_config = types.ThinkingConfig(
-            thinking_budget=-1,
-        ),
-        tools=tools,
-        response_mime_type="text/plain",
-        system_instruction=[
-            types.Part.from_text(text="""Concisely answer questions, referring to reliable sources. Cite your sources. Rely on high-quality sources and treat lower quality sources (such as YouTube) with skepticism. """),
-        ],
-    )
-
-    for chunk in client.models.generate_content_stream(
-        model=model,
-        contents=contents,
-        config=generate_content_config,
-    ):
-        print(chunk.text, end="")
-
-if __name__ == "__main__":
-    generate()
+        st.warning("Please enter a question first.")
