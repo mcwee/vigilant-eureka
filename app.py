@@ -40,7 +40,7 @@ try:
     from google.generativeai.types import Tool
 
     # The modern and explicit way to define the search tool
-    google_search_tool = Tool.from_google_search_retrieval()
+    google_search_tool = Tool.from_google_search_tool()
 
     model = genai.GenerativeModel(
         model_name="gemini-2.5-pro",
@@ -53,7 +53,7 @@ except (ImportError, AttributeError):
     model = genai.GenerativeModel(
         model_name="gemini-2.5-pro",
         system_instruction="""Concisely answer questions, referring to reliable sources. Cite your sources. Rely on high-quality sources and treat lower quality sources (such as YouTube) with skepticism. """,
-        tools=["google_search_retrieval"], # Using the name from the error log
+        tools=["google_search_tool"], # Using the name from the error log
     )
 
 
