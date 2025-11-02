@@ -31,13 +31,13 @@ except Exception as e:
 
 
 # --- Model Configuration ---
-# CORRECTED SECTION:
-# 1. Using the correct, publicly available model name.
-# 2. Using the correct string identifier for the Google Search tool.
+# CORRECTED SECTION BASED ON ERROR LOGS:
+# 1. Using the stable "gemini-pro" model name to resolve the "404 Not Found" error.
+# 2. Using "google_search_retrieval" as the tool name, as specified by the ValueError log.
 model = genai.GenerativeModel(
-    model_name="gemini-1.5-pro-latest",  # FIX #1: Correct model name
+    model_name="gemini-pro",
     system_instruction="""Concisely answer questions, referring to reliable sources. Cite your sources. Rely on high-quality sources and treat lower quality sources (such as YouTube) with skepticism. """,
-    tools=["google_search_retrieval"],  # FIX #2: Correct tool name
+    tools=["google_search_retrieval"],
 )
 
 
@@ -65,7 +65,7 @@ if user_prompt := st.chat_input("Ask your question here:"):
                 # Create a chat session with the full history
                 chat = model.start_chat(history=[
                     {"role": msg["role"], "parts": [msg["content"]]}
-                    for msg in st.session_state.messages[:-1] # Exclude the last user message to send it fresh
+                    for msg in st.session_state.messages[:-1]
                 ])
 
                 # Send the new prompt and stream the response
@@ -78,4 +78,5 @@ if user_prompt := st.chat_input("Ask your question here:"):
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
 
             except Exception as e:
-                st.error(f"An error occurred: {e}")
+                # Display the actual error message from the API on the app page
+                st.error(e)
